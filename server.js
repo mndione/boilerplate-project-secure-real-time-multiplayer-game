@@ -9,15 +9,48 @@ const fccTestingRoutes = require('./routes/fcctesting.js');
 const runner = require('./test-runner.js');
 
 const app = express();
+const http = require('http');
+const server = http.createServer(app);
+
+const io = socket.listen(server);
+let players = [];
+io.on("connection", socket => {
+  //console.log('new player connected !');
+  const id = socket.id;
+  if(!players.includes(id)) players.push(id);
+  io.emit('new player', socket.id, players);
+
+  socket.on('disconnect', () => {
+    //console.log('player disconnected !');
+    const id = socket.id;
+    players = players.filter(sid => sid != id);
+    io.emit('del player', id);
+    //console.log(players);
+  });
+
+  socket.on('score', (id, score) => {
+    //console.log('event score: ', id, score);
+    players = players.map(p => {
+      if(p.id == id) p.score = score;
+      return p;
+    });
+    io.emit('update', id, score);
+  });
+});
+
+
+
+
 
 app.use('/public', express.static(process.cwd() + '/public'));
-app.use('/assets', express.static(process.cwd() + '/assets'));
+//app.use('/assets', express.static(process.cwd() + '/assets'));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 //For FCC testing purposes and enables user to connect from outside the hosting platform
 app.use(cors({origin: '*'})); 
+
 
 // Index page (static HTML)
 app.route('/')
@@ -38,7 +71,7 @@ app.use(function(req, res, next) {
 const portNum = process.env.PORT || 3000;
 
 // Set up server and tests
-const server = app.listen(portNum, () => {
+server.listen(portNum, () => {
   console.log(`Listening on port ${portNum}`);
   if (process.env.NODE_ENV==='test') {
     console.log('Running Tests...');
